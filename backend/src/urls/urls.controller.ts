@@ -2,6 +2,7 @@ import { Body, Controller, Param, Get, Post, Res, Req } from '@nestjs/common';
 import { UrlsService } from './urls.service';
 import type { Request, Response } from 'express';
 import { CreateUrlDto } from './dto/create-url.dto';
+import { SkipThrottle } from '@nestjs/throttler';
 
 @Controller()
 export class UrlsController {
@@ -15,6 +16,7 @@ export class UrlsController {
     }
 
     @Get(':shortCode')
+    @SkipThrottle()
     async redirect(
         @Param('shortCode') shortCode: string,
         @Res() res: Response,
