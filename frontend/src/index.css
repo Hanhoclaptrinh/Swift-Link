@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-agent-900 text-slate-200 overflow-x-hidden m-0 p-0 font-sans selection:bg-agent-accent selection:text-black;
+    min-height: 100vh;
+  }
+}
+
+@layer utilities {
+  .glass-panel {
+    @apply bg-agent-800/60 backdrop-blur-xl border border-white/10 shadow-glass rounded-2xl;
+  }
+  
+  .glass-input {
+    @apply bg-agent-900/50 backdrop-blur-md border border-agent-accent/30 text-white
+           focus:outline-none focus:border-agent-accent focus:ring-1 focus:ring-agent-accent/50 
+           placeholder:text-slate-500 rounded-xl transition-all duration-300;
+  }
+  
+  .glass-button {
+    @apply relative overflow-hidden bg-agent-accent/10 border border-agent-accent/50 text-agent-accent 
+           hover:bg-agent-accent hover:text-black hover:shadow-neon-cyan
+           rounded-xl font-medium transition-all duration-300;
+  }
+  
+  .text-glow {
+    text-shadow: 0 0 10px rgba(0, 210, 255, 0.4);
+  }
+  .text-glow-purple {
+    text-shadow: 0 0 10px rgba(176, 38, 255, 0.4);
+  }
+}
