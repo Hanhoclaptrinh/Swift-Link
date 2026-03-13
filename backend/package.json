@@ -26,6 +26,7 @@
     "@nestjs/core": "^11.0.1",
     "@nestjs/mongoose": "^11.0.4",
     "@nestjs/platform-express": "^11.0.1",
+    "@nestjs/swagger": "^11.2.6",
     "@nestjs/throttler": "^6.5.0",
     "cache-manager": "^7.2.8",
     "cache-manager-redis-store": "^3.0.1",
@@ -36,7 +37,8 @@
     "nanoid": "^5.1.6",
     "redis": "^5.11.0",
     "reflect-metadata": "^0.2.2",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "swagger-ui-express": "^5.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",
