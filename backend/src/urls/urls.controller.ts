@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Get, Post, Res, Req } from '@nestjs/common';
+import { Body, Controller, Param, Get, Post, Res, Req, NotFoundException } from '@nestjs/common';
 import { UrlsService } from './urls.service';
 import type { Request, Response } from 'express';
 import { CreateUrlDto } from './dto/create-url.dto';
@@ -27,5 +27,12 @@ export class UrlsController {
         if (!originalUrl) return res.status(404).send('Link not found');
 
         res.redirect(originalUrl);
+    }
+
+    @Get(':code/qr')
+    async generateQr(@Param('code') code: string) {
+        await this.urlsService.findByCode(code);
+
+        return this.urlsService.generateQr(code);
     }
 }

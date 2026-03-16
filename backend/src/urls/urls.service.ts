@@ -1,4 +1,4 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { nanoid } from 'nanoid';
 import { Url, UrlDocument } from './schemas/url.schema';
@@ -7,6 +7,7 @@ import { CreateUrlDto } from './dto/create-url.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { AnalyticsService } from 'src/analytics/analytics.service';
 import type { Request } from 'express';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class UrlsService {
@@ -52,7 +53,7 @@ export class UrlsService {
         // query db
         const url = await this.urlModel.findOne({ shortCode }).lean();
 
-        if (!url) return null;
+        if (!url) throw new NotFoundException('URL not found');
 
         // cache redis
         await this.redis.set(cacheKey, url.originalUrl, 'EX', 3600);
@@ -78,5 +79,11 @@ export class UrlsService {
         });
 
         return url.originalUrl;
+    }
+
+    async generateQr(shortCode: string) {
+        const shortUrl = `http://localhost:3000/${shortCode}`;
+
+        return QRCode.toDataURL(shortUrl);
     }
 }
