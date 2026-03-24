@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link2, Copy, CheckCircle, ArrowRight, Activity, Zap, Scissors, QrCode, X, BarChart2 } from 'lucide-react';
+import { Link2, Copy, CheckCircle, ArrowRight, Activity, Zap, Scissors, QrCode, X, BarChart2, LogOut, User as UserIcon } from 'lucide-react';
 import axios from 'axios';
 import { Background } from '../components/Background';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const API_BASE = 'http://localhost:3000';
 
@@ -11,9 +12,11 @@ interface RecentUrl {
   shortUrl: string;
   originalUrl: string;
   shortCode?: string;
+  clicks?: number;
 }
 
 export function Home() {
+  const { user, token, logout } = useAuth();
   const [url, setUrl] = useState('');
   const [customCode, setCustomCode] = useState('');
   const [recentUrls, setRecentUrls] = useState<RecentUrl[]>([]);
@@ -32,39 +35,39 @@ export function Home() {
   };
 
   useEffect(() => {
-    const saved = localStorage.getItem('swiftlink_recent');
-    if (saved) {
-      try {
-        const parsed: RecentUrl[] = JSON.parse(saved);
-        const normalized = parsed.map((item) => ({
-          ...item,
-          shortCode: item.shortCode ?? extractCodeFromUrl(item.shortUrl),
-        }));
-        setRecentUrls(normalized);
-      } catch (e) {
-        console.error('Failed to parse recent URLs');
+    const fetchLinks = async () => {
+      if (token) {
+        try {
+          const res = await axios.get(`${API_BASE}/urls/mine`, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+          const mapped = res.data.map((item: any) => ({
+            ...item,
+            shortUrl: `${API_BASE}/${item.shortCode}`
+          }));
+          setRecentUrls(mapped);
+        } catch (err) {
+          console.error("Failed to fetch user links");
+        }
+      } else {
+        const saved = localStorage.getItem('swiftlink_recent');
+        if (saved) {
+          try {
+            const parsed: RecentUrl[] = JSON.parse(saved);
+            const normalized = parsed.map((item) => ({
+              ...item,
+              shortCode: item.shortCode ?? extractCodeFromUrl(item.shortUrl),
+            }));
+            setRecentUrls(normalized);
+          } catch (e) {
+            console.error('Failed to parse recent URLs');
+          }
+        }
       }
-    }
-  }, []);
+    };
 
-  const saveRecentUrls = (newUrls: RecentUrl[]) => {
-    setRecentUrls(newUrls);
-    localStorage.setItem('swiftlink_recent', JSON.stringify(newUrls));
-  };
-
-  const fetchQrForCode = async (code: string) => {
-    setQrLoading(true);
-    setQrError('');
-    try {
-      const response = await axios.get(`${API_BASE}/${code}/qr`);
-      setQrDataUrl(response.data);
-      setQrShortCode(code);
-    } catch (err: any) {
-      setQrError(err.response?.data?.message || 'Unable to fetch QR code');
-    } finally {
-      setQrLoading(false);
-    }
-  };
+    fetchLinks();
+  }, [token]);
 
   const handleShorten = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,13 +80,27 @@ export function Home() {
       const payload: any = { originalUrl: url };
       if (customCode.trim()) payload.shortCode = customCode.trim();
 
-      const response = await axios.post(`${API_BASE}/urls/shorten`, payload);
-      const newShortUrl = `${API_BASE}/${response.data.shortCode}`;
-      const newItem: RecentUrl = { shortUrl: newShortUrl, originalUrl: url, shortCode: response.data.shortCode };
+      const headers: any = {};
+      if (token) headers.Authorization = `Bearer ${token}`;
 
-      const filteredUrls = recentUrls.filter(item => item.shortUrl !== newShortUrl);
-      const updatedUrls = [newItem, ...filteredUrls].slice(0, 5);
-      saveRecentUrls(updatedUrls);
+      const response = await axios.post(`${API_BASE}/urls/shorten`, payload, { headers });
+      const newShortUrl = `${API_BASE}/${response.data.shortCode}`;
+      const newItem: RecentUrl = { 
+        shortUrl: newShortUrl, 
+        originalUrl: url, 
+        shortCode: response.data.shortCode,
+        clicks: 0 
+      };
+
+      if (token) {
+        // Just refresh the list from server
+        setRecentUrls([newItem, ...recentUrls].slice(0, 10));
+      } else {
+        const filteredUrls = recentUrls.filter(item => item.shortUrl !== newShortUrl);
+        const updatedUrls = [newItem, ...filteredUrls].slice(0, 5);
+        setRecentUrls(updatedUrls);
+        localStorage.setItem('swiftlink_recent', JSON.stringify(updatedUrls));
+      }
 
       await fetchQrForCode(response.data.shortCode);
       setUrl('');
@@ -95,6 +112,20 @@ export function Home() {
     }
   };
 
+  const fetchQrForCode = async (code: string) => {
+    setQrLoading(true);
+    setQrError('');
+    try {
+      const response = await axios.get(`${API_BASE}/${code}/qr`);
+      setQrDataUrl(response.data);
+      setQrShortCode(code);
+    } catch (err: any) {
+      setQrError('Unable to fetch QR code');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
   const copyToClipboard = (text: string, index: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIndex(index);
@@ -102,8 +133,36 @@ export function Home() {
   };
 
   return (
-    <div className="min-h-screen font-sans text-slate-100 flex flex-col pt-16 pb-12 px-4 sm:px-6 relative selection:bg-agent-accent/30">
+    <div className="min-h-screen font-sans text-slate-100 flex flex-col pt-8 pb-12 px-4 sm:px-6 relative selection:bg-agent-accent/30">
       <Background />
+
+      {/* Auth Header */}
+      <div className="max-w-5xl mx-auto w-full flex justify-end mb-8 relative z-50">
+        {user ? (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full glass-panel border-agent-purple/30">
+              <UserIcon size={16} className="text-agent-purple" />
+              <span className="text-sm font-semibold">{user.name}</span>
+            </div>
+            <button 
+              onClick={logout}
+              className="p-2.5 rounded-full glass-panel shadow-lg hover:bg-red-500/20 hover:text-red-400 transition-colors border-red-500/20"
+              title="Logout"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-3">
+            <Link to="/login" className="px-5 py-2 rounded-full text-sm font-bold border border-white/10 hover:bg-white/5 transition-colors">
+              Login
+            </Link>
+            <Link to="/register" className="px-5 py-2 rounded-full text-sm font-bold bg-agent-accent text-black hover:bg-agent-accent/90 transition-all shadow-lg shadow-agent-accent/20">
+              Register
+            </Link>
+          </div>
+        )}
+      </div>
 
       <motion.div
         className="text-center mb-10 relative z-10"
@@ -173,7 +232,9 @@ export function Home() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-2xl mx-auto relative z-10">
             <div className="flex items-center gap-4 mb-5 px-2">
               <div className="h-[1px] flex-1 bg-gradient-to-r from-transparent to-agent-accent/30"></div>
-              <span className="text-xs uppercase tracking-widest text-agent-accent/80 font-semibold">Active Nodes ({recentUrls.length}/5)</span>
+              <span className="text-xs uppercase tracking-widest text-agent-accent/80 font-semibold">
+                {user ? `Personal Terminal (${recentUrls.length})` : `Recent Nodes (${recentUrls.length}/5)`}
+              </span>
               <div className="h-[1px] flex-1 bg-gradient-to-l from-transparent to-agent-accent/30"></div>
             </div>
 
@@ -184,7 +245,12 @@ export function Home() {
                     <a href={item.shortUrl} target="_blank" rel="noopener noreferrer" className="text-xl font-medium text-agent-accent hover:text-white truncate block mb-1">
                       {item.shortUrl}
                     </a>
-                    <p className="text-xs text-slate-400 truncate w-full">{item.originalUrl}</p>
+                    <p className="text-xs text-slate-400 truncate w-full flex items-center gap-2">
+                       {item.clicks !== undefined && (
+                         <span className="px-1.5 py-0.5 bg-agent-purple/20 text-agent-purple rounded text-[10px] font-bold">{item.clicks} CLICKS</span>
+                       )}
+                       {item.originalUrl}
+                    </p>
                   </div>
 
                   <div className="flex gap-2 items-center self-end sm:self-auto">
@@ -219,22 +285,22 @@ export function Home() {
 
       <AnimatePresence>
         {qrDataUrl && (
-          <motion.div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={() => setQrDataUrl(null)}>
-            <motion.div className="relative w-full max-w-sm bg-agent-950/90 border border-white/10 rounded-2xl p-6" onClick={(e) => e.stopPropagation()}>
+          <motion.div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4" onClick={() => setQrDataUrl(null)}>
+            <motion.div className="relative w-full max-w-sm bg-agent-950/90 border border-white/10 rounded-2xl p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
               <div className="flex items-start justify-between mb-4">
                 <div><h3 className="text-lg font-semibold text-white">QR code</h3></div>
                 <button onClick={() => setQrDataUrl(null)} className="p-2 rounded-full hover:bg-white/10 text-slate-300"><X size={18} /></button>
               </div>
-              <div className="flex items-center justify-center mb-4">
-                {qrLoading ? <div className="animate-spin h-10 w-10 border-4 border-agent-accent rounded-full border-t-transparent" /> : <img src={qrDataUrl} className="h-48 w-48 rounded-lg" />}
+              <div className="flex items-center justify-center mb-6">
+                {qrLoading ? <div className="animate-spin h-10 w-10 border-4 border-agent-accent rounded-full border-t-transparent" /> : <div className="p-3 bg-white rounded-xl"><img src={qrDataUrl} className="h-44 w-44" /></div>}
               </div>
-              <a href={qrDataUrl ?? ''} download="qr.png" className="w-full text-center py-3 bg-agent-accent text-black rounded-xl font-semibold block">Download</a>
+              <a href={qrDataUrl ?? ''} download="qr.png" className="w-full text-center py-4 bg-agent-accent text-black rounded-xl font-bold block shadow-lg shadow-agent-accent/20">Download PNG</a>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <footer className="mt-12 pb-8 text-center"><p className="text-xs text-slate-600 uppercase">Powered by Deepmind Architecture &copy; {new Date().getFullYear()}</p></footer>
+      <footer className="mt-12 pb-8 text-center"><p className="text-xs text-slate-600 uppercase tracking-widest">Powered by Deepmind Architecture &copy; {new Date().getFullYear()}</p></footer>
     </div>
   );
 }

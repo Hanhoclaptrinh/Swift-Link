@@ -8,6 +8,8 @@ import { RedisModule } from './redis/redis.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -25,15 +27,28 @@ import { APP_GUARD } from '@nestjs/core';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 60000,
-          limit: 100
-        }
+          name: 'shorten',
+          ttl: 30000, // 30s
+          limit: 3,
+        },
+        {
+          name: 'analytics',
+          ttl: 60000, // 1m
+          limit: 30,
+        },
+        {
+          name: 'default',
+          ttl: 60000, // 1m
+          limit: 60,
+        },
       ]
     }),
 
     UrlsModule,
     RedisModule,
-    AnalyticsModule
+    AnalyticsModule,
+    AuthModule,
+    UsersModule
   ],
   controllers: [AppController],
   providers: [

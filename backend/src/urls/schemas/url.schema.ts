@@ -1,10 +1,13 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type UrlDocument = Url & Document;
 
 @Schema({ timestamps: true })
 export class Url {
+    @Prop({ type: Types.ObjectId, ref: 'User', index: true })
+    userId?: Types.ObjectId;
+
     @Prop({ required: true, unique: true })
     shortCode: string;
 

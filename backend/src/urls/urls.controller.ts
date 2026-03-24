@@ -1,8 +1,10 @@
-import { Body, Controller, Param, Get, Post, Res, Req, NotFoundException } from '@nestjs/common';
+import { Body, Controller, Param, Get, Post, Res, Req, UseGuards } from '@nestjs/common';
 import { UrlsService } from './urls.service';
 import type { Request, Response } from 'express';
 import { CreateUrlDto } from './dto/create-url.dto';
-import { SkipThrottle } from '@nestjs/throttler';
+import { SkipThrottle, Throttle } from '@nestjs/throttler';
+import { OptionalJwtAuthGuard } from '../auth/jwt-optional.guard';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller()
 export class UrlsController {
@@ -10,9 +12,18 @@ export class UrlsController {
         private readonly urlsService: UrlsService
     ) { }
 
+    @UseGuards(OptionalJwtAuthGuard)
+    @Throttle({ shorten: { limit: 3, ttl: 30000 } })
     @Post('urls/shorten')
-    create(@Body() body: CreateUrlDto) {
-        return this.urlsService.shortenUrl(body);
+    create(@Body() body: CreateUrlDto, @Req() req: any) {
+        const userId = req.user?.userId;
+        return this.urlsService.shortenUrl(body, userId);
+    }
+
+    @UseGuards(JwtAuthGuard)
+    @Get('urls/mine')
+    async getUserUrls(@Req() req: any) {
+        return this.urlsService.getUserUrls(req.user.userId);
     }
 
     @Get(':shortCode')

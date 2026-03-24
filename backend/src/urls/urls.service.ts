@@ -2,7 +2,7 @@ import { ConflictException, Injectable, NotFoundException } from '@nestjs/common
 import { InjectModel } from '@nestjs/mongoose';
 import { nanoid } from 'nanoid';
 import { Url, UrlDocument } from './schemas/url.schema';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { CreateUrlDto } from './dto/create-url.dto';
 import { RedisService } from 'src/redis/redis.service';
 import { AnalyticsService } from 'src/analytics/analytics.service';
@@ -18,7 +18,7 @@ export class UrlsService {
         private analyticsService: AnalyticsService
     ) { }
 
-    async shortenUrl(dto: CreateUrlDto) {
+    async shortenUrl(dto: CreateUrlDto, userId?: string) {
         let { originalUrl, shortCode } = dto;
 
         // user khong nhap shortcode -> tu tao bang nanoid
@@ -34,10 +34,15 @@ export class UrlsService {
         // luu url va shortcode
         const url = await this.urlModel.create({
             shortCode,
-            originalUrl
+            originalUrl,
+            userId: userId ? new Types.ObjectId(userId) : undefined
         });
 
         return url;
+    }
+
+    async getUserUrls(userId: string) {
+        return this.urlModel.find({ userId: new Types.ObjectId(userId) }).sort({ createdAt: -1 }).lean();
     }
 
     async findByCode(shortCode: string) {
